@@ -12,5 +12,3 @@ pytest_cov-*
 .*.swp
 *.*~
 .cache
-
-
