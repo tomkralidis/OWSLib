@@ -10,6 +10,7 @@ class Namespaces(object):
 
     namespace_dict = {
         'atom'  :   'http://www.w3.org/2005/Atom',
+        'context':  'http://www.opengis.net/context',
         'csw'   :   'http://www.opengis.net/cat/csw/2.0.2',
         'dc'    :   'http://purl.org/dc/elements/1.1/',
         'dct'   :   'http://purl.org/dc/terms/',
@@ -38,6 +39,7 @@ class Namespaces(object):
         'rim'   :   'urn:oasis:names:tc:ebxml-regrep:xsd:rim:3.0',
         'rdf'   :   'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
         'sa'    :   'http://www.opengis.net/sampling/1.0',
+        'sld'   :   'http://www.opengis.net/sld',
         'sml'   :   'http://www.opengis.net/sensorML/1.0.1',
         'sml101':   'http://www.opengis.net/sensorML/1.0.1',
         'sos'   :   'http://www.opengis.net/sos/1.0',
