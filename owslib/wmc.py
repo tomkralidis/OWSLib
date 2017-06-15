@@ -251,47 +251,20 @@ class ViewContext(object):
             viewcontext = etree.Element('{http://www.opengis.net/context}ViewContext')
 
         viewcontext.attrib['version'] = self.version or '1.1.0'
-        viewcontext.attrib['id'] = self.id or 'owslib-context'
+        viewcontext.attrib['id'] = self.id or 'owslib-wmc'
 
-        general = etree.SubElement(viewcontext, '{http://www.opengis.net/context}General')
-        window = etree.SubElement(general, '{http://www.opengis.net/context}Window')
+        viewcontext.append(self.general.toexml())
 
-        try:
-            window.attrib['width'] = self.general.window.width
-        except AttributeError:
-            window.attrib['width'] = '500'
-        try:
-            window.attrib['height'] = self.general.window.height
-        except AttributeError:
-            window.attrib['height'] = '300'
-
-        if window.attrib['width'] is None: window.attrib['width'] = '500'
-        if window.attrib['height'] is None: window.attrib['height'] = '300'
-
-        bbox = etree.SubElement(general, '{http://www.opengis.net/context}BoundingBox')
-        bbox.attrib['srs'] = self.general.bbox.srs
-        bbox.attrib['minx'] = self.general.bbox.minx
-        bbox.attrib['miny'] = self.general.bbox.minx
-        bbox.attrib['maxx'] = self.general.bbox.maxx
-        bbox.attrib['maxy'] = self.general.bbox.maxy
-
-        if bbox.attrib['srs'] is None: bbox.attrib['srs'] = 'EPSG:4326'
-        if bbox.attrib['minx'] is None: bbox.attrib['minx'] = '-180'
-        if bbox.attrib['miny'] is None: bbox.attrib['miny'] = '-90'
-        if bbox.attrib['maxx'] is None: bbox.attrib['maxx'] = '180'
-        if bbox.attrib['maxy'] is None: bbox.attrib['maxy'] = '90'
-
-        layerlist = etree.SubElement(viewcontext, '{http://www.opengis.net/context}LayerList')
-        for layer_ in self.layerlist:
-            layer = etree.SubElement(layerlist, '{http://www.opengis.net/context}Layer')
-            server = etree.SubElement(layer, '{http://www.opengis.net/context}Service', service=layer_.server['service'], version=layer_.server['version'], title=layer_.server['title'])
-            name = etree.SubElement(layer, '{http://www.opengis.net/context}Name').text = layer_.name
+        if self.layerlist:
+            layerlist = etree.SubElement(viewcontext, '{http://www.opengis.net/context}LayerList')
+            for layer in self.layerlist:
+                layerlist.append(layer.toexml())
 
         return etree.tostring(viewcontext)
 
     def __repr__(self):
         """representation"""
-        return '<ViewContext %r>' % (self.title)
+        return '<ViewContext %r>' % self.general.title
 
 class General(object):
     """General"""
@@ -299,6 +272,7 @@ class General(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.window = Window()
         self.bbox = BoundingBox()
         self.title = None
@@ -308,35 +282,61 @@ class General(object):
         self.descriptionurl = URLType()
         self.contact = ContactInformation()
 
-        if el is None:
+        if self.el is None:
             return
 
-        self.window = Window(el.find('{http://www.opengis.net/context}Window'))
-        self.bbox = BoundingBox(el.find('{http://www.opengis.net/context}BoundingBox'))
+        self.window = Window(self.el.find('{http://www.opengis.net/context}Window'))
+        self.bbox = BoundingBox(self.el.find('{http://www.opengis.net/context}BoundingBox'))
 
-        value = el.find('{http://www.opengis.net/context}Title')
+        value = self.el.find('{http://www.opengis.net/context}Title')
         if value is not None:
             self.title = value.text
 
         self.keywords = []
-        for keyword in el.findall('{http://www.opengis.net/context}KeywordList/{http://www.opengis.net/context}Keyword'):
+        for keyword in self.el.findall('{http://www.opengis.net/context}KeywordList/{http://www.opengis.net/context}Keyword'):
             self.keywords.append(keyword.text)
 
-        value = el.find('{http://www.opengis.net/context}Abstract')
+        value = self.el.find('{http://www.opengis.net/context}Abstract')
         if value is not None:
             self.abstract = value.text
 
-        value = el.find('{http://www.opengis.net/context}LogoURL')
+        value = self.el.find('{http://www.opengis.net/context}LogoURL')
         if value is not None:
             self.logourl = URLType(value)
 
-        value = el.find('{http://www.opengis.net/context}DescriptionURL')
+        value = self.el.find('{http://www.opengis.net/context}DescriptionURL')
         if value is not None:
             self.descriptionurl = URLType(value)
 
-        value = el.find('{http://www.opengis.net/context}ContactInformation')
+        value = self.el.find('{http://www.opengis.net/context}ContactInformation')
         if value is not None:
             self.contact = ContactInformation(value)
+
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        general = etree.Element(self.el.tag)
+
+        if self.window is not None:
+            general.append(self.window.toexml())
+        if self.bbox is not None:
+            general.append(self.bbox.toexml())
+        if self.title is not None:
+            etree.SubElement(general, '{http://www.opengis.net/context}Title').text = self.title
+        if self.keywords:
+            kws = etree.SubElement(general, '{http://www.opengis.net/context}KeywordList')
+            for keyword in self.keywords:
+                etree.SubElement(kws, '{http://www.opengis.net/context}Keyword').text = keyword
+        if self.abstract is not None:
+            etree.SubElement(general, '{http://www.opengis.net/context}Abstract').text = self.abstract
+        if self.logourl is not None:
+            general.append(self.logourl.toexml())
+        if self.descriptionurl is not None:
+            general.append(self.descriptionurl.toexml())
+        if self.contact is not None:
+            general.append(self.contact.toexml())
+
+        return general
 
 
 class Window(object):
@@ -345,14 +345,27 @@ class Window(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.width = None
         self.height = None
 
-        if el is None:
+        if self.el is None:
             return
 
-        self.width = el.attrib.get('width')
-        self.height = el.attrib.get('height')
+        self.width = self.el.attrib.get('width')
+        self.height = self.el.attrib.get('height')
+
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        window = etree.Element(self.el.tag)
+
+        if self.width is not None:
+            window.attrib['width'] = self.width
+        if self.height is not None:
+            window.attrib['height'] = self.height
+
+        return window
 
 
 class BoundingBox(object):
@@ -361,6 +374,7 @@ class BoundingBox(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.srs = None
         self.minx = None
         self.miny = None
@@ -376,6 +390,24 @@ class BoundingBox(object):
         self.maxx = el.attrib.get('maxx')
         self.maxy = el.attrib.get('maxy')
 
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        bbox = etree.Element(self.el.tag)
+
+        if self.srs is not None:
+            bbox.attrib['SRS'] = self.srs
+        if self.minx is not None:
+            bbox.attrib['minx'] = self.minx
+        if self.miny is not None:
+            bbox.attrib['miny'] = self.miny
+        if self.maxx is not None:
+            bbox.attrib['maxx'] = self.maxx
+        if self.maxy is not None:
+            bbox.attrib['maxy'] = self.maxy
+
+        return bbox
+
 
 class ContactInformation(object):
     """ContactInformation"""
@@ -383,6 +415,7 @@ class ContactInformation(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.person = None
         self.organization = None
         self.position = None
@@ -391,36 +424,60 @@ class ContactInformation(object):
         self.fax = None
         self.email = None
 
-        if el is None:
+        if self.el is None:
             return
 
-        value = el.find('{http://www.opengis.net/context}ContactPersonPrimary/{http://www.opengis.net/context}ContactPerson')
+        value = self.el.find('{http://www.opengis.net/context}ContactPersonPrimary/{http://www.opengis.net/context}ContactPerson')
         if value is not None:
             self.person = value.text
 
-        value = el.find('{http://www.opengis.net/context}ContactPersonPrimary/{http://www.opengis.net/context}ContactOrganization')
+        value = self.el.find('{http://www.opengis.net/context}ContactPersonPrimary/{http://www.opengis.net/context}ContactOrganization')
         if value is not None:
             self.organization = value.text
 
-        value = el.find('{http://www.opengis.net/context}ContactPosition')
+        value = self.el.find('{http://www.opengis.net/context}ContactPosition')
         if value is not None:
             self.position = value.text
 
-        value = el.find('{http://www.opengis.net/context}ContactAddress')
+        value = self.el.find('{http://www.opengis.net/context}ContactAddress')
         if value is not None:
             self.address = Address(value)
 
-        value = el.find('{http://www.opengis.net/context}ContactVoiceTelephone')
+        value = self.el.find('{http://www.opengis.net/context}ContactVoiceTelephone')
         if value is not None:
             self.telephone = value.text
 
-        value = el.find('{http://www.opengis.net/context}ContactFacsimileTelephone')
+        value = self.el.find('{http://www.opengis.net/context}ContactFacsimileTelephone')
         if value is not None:
             self.fax = value.text
 
-        value = el.find('{http://www.opengis.net/context}ContactElectronicMailAddress')
+        value = self.el.find('{http://www.opengis.net/context}ContactElectronicMailAddress')
         if value is not None:
             self.email = value.text
+
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        ci = etree.Element(self.el.tag)
+
+        if self.person is not None or self.organization is not None:
+            cpp = etree.SubElement(ci, '{http://www.opengis.net/context}ContactPersonPrimary')
+            if self.person is not None:
+                etree.SubElement(cpp, '{http://www.opengis.net/context}ContactPerson').text = self.person
+            if self.organization is not None:
+                etree.SubElement(cpp, '{http://www.opengis.net/context}ContactOrganization').text = self.organization
+        if self.position is not None:
+            etree.SubElement(ci, '{http://www.opengis.net/context}ContactPosition').text = self.position
+        if self.address is not None:
+            ci.append(self.address.toexml())
+        if self.telephone is not None:
+            etree.SubElement(ci, '{http://www.opengis.net/context}ContactVoiceTelephone').text = self.telephone
+        if self.fax is not None:
+            etree.SubElement(ci, '{http://www.opengis.net/context}ContactFacsimileTelephone').text = self.fax
+        if self.email is not None:
+            etree.SubElement(ci, '{http://www.opengis.net/context}ContactElectronicMailAddress').text = self.email
+
+        return ci
 
 
 class Address(object):
@@ -429,6 +486,7 @@ class Address(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.addresstype = None
         self.address = None
         self.city = None
@@ -436,32 +494,52 @@ class Address(object):
         self.postcode = None
         self.country = None
 
-        if el is None:
+        if self.el is None:
             return
 
-        value = el.find('{http://www.opengis.net/context}AddressType')
+        value = self.el.find('{http://www.opengis.net/context}AddressType')
         if value is not None:
             self.addresstype = value.text
 
-        value = el.find('{http://www.opengis.net/context}Address')
+        value = self.el.find('{http://www.opengis.net/context}Address')
         if value is not None:
             self.address = value.text
         
-        value = el.find('{http://www.opengis.net/context}City')
+        value = self.el.find('{http://www.opengis.net/context}City')
         if value is not None:
             self.city = value.text
 
-        value = el.find('{http://www.opengis.net/context}StateOrProvince')
+        value = self.el.find('{http://www.opengis.net/context}StateOrProvince')
         if value is not None:
             self.stateorprovince = value.text
 
-        value = el.find('{http://www.opengis.net/context}PostCode')
+        value = self.el.find('{http://www.opengis.net/context}PostCode')
         if value is not None:
             self.postcode = value.text
 
-        value = el.find('{http://www.opengis.net/context}Country')
+        value = self.el.find('{http://www.opengis.net/context}Country')
         if value is not None:
             self.country = value.text
+
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        address = etree.Element(self.el.tag)
+
+        if self.addresstype is not None:
+            etree.SubElement(address, '{http://www.opengis.net/context}AddressType').text = self.addresstype
+        if self.address is not None:
+            etree.SubElement(address, '{http://www.opengis.net/context}Address').text = self.address
+        if self.city is not None:
+            etree.SubElement(address, '{http://www.opengis.net/context}City').text = self.city
+        if self.stateorprovince is not None:
+            etree.SubElement(address, '{http://www.opengis.net/context}StateOrProvince').text = self.stateorprovince
+        if self.postcode is not None:
+            etree.SubElement(address, '{http://www.opengis.net/context}PostCode').text = self.postcode
+        if self.country is not None:
+            etree.SubElement(address, '{http://www.opengis.net/context}Country').text = self.country
+
+        return address
 
 
 class URLType(object):
@@ -470,25 +548,44 @@ class URLType(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.width = None
-        self.height= None
+        self.height = None
         self.format = None
         self.url = None
 
-        if el is None:
+        if self.el is None:
             return
 
-        self.width = el.attrib.get('width')
-        self.height = el.attrib.get('height')
-        self.format = el.attrib.get('format')
+        self.width = self.el.attrib.get('width')
+        self.height = self.el.attrib.get('height')
+        self.format = self.el.attrib.get('format')
 
-        value = el.find('{http://www.opengis.net/context}OnlineResource')
+        value = self.el.find('{http://www.opengis.net/context}OnlineResource')
         if value is not None:
             self.url = value.attrib.get('{http://www.w3.org/1999/xlink}href')
 
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        url = etree.Element(self.el.tag)
+
+        if self.width is not None:
+            url.attrib['width'] = self.width
+        if self.height is not None:
+            url.attrib['height'] = self.height
+        if self.format is not None:
+            url.attrib['format'] = self.format
+        if self.url is not None:
+            or_ = etree.SubElement(url, '{http://www.opengis.net/context}OnlineResource')
+            or_.attrib['{http://www.w3.org/1999/xlink}href'] = self.url
+
+        return url
+
+
     def __repr__(self):
         """representation"""
-        return '<URLType %r>' % (self.url)
+        return '<URLType %r %r>' % (self.el.tag, self.url)
 
 class Layer(object):
     """Layer"""
@@ -496,14 +593,15 @@ class Layer(object):
     def __init__(self, el=None):
         """init"""
 
+        self.el = el
         self.queryable = None
         self.hidden = None
         self.server = {}
         self.name = None
         self.title = None
         self.abstract = None
-        self.dataurl = None
-        self.metadataurl = None
+        self.dataurl = URLType()
+        self.metadataurl = URLType()
         self.minscale = None
         self.maxscale = None
         self.srslist = []
@@ -511,49 +609,49 @@ class Layer(object):
         self.styles = []
         self.dimensions = []
 
-        if el is None:
+        if self.el is None:
             return
 
-        self.queryable = el.attrib.get('queryable')
-        self.hidden = el.attrib.get('hidden')
+        self.queryable = self.el.attrib.get('queryable')
+        self.hidden = self.el.attrib.get('hidden')
 
-        server = el.find('{http://www.opengis.net/context}Server')
+        server = self.el.find('{http://www.opengis.net/context}Server')
 
         self.server['service'] = server.attrib.get('service')
         self.server['version'] = server.attrib.get('version')
         self.server['title'] = server.attrib.get('title')
         self.server['url'] = server.find('{http://www.opengis.net/context}OnlineResource').attrib.get('{http://www.w3.org/1999/xlink}href')
 
-        self.name = el.find('{http://www.opengis.net/context}Name').text
-        self.title = el.find('{http://www.opengis.net/context}Title').text
+        self.name = self.el.find('{http://www.opengis.net/context}Name').text
+        self.title = self.el.find('{http://www.opengis.net/context}Title').text
 
-        value = el.find('{http://www.opengis.net/context}Abstract')
+        value = self.el.find('{http://www.opengis.net/context}Abstract')
         if value is not None:
             self.abstract = value.text
 
-        value = el.find('{http://www.opengis.net/context}DataURL')
+        value = self.el.find('{http://www.opengis.net/context}DataURL')
         if value is not None:
             self.dataurl = URLType(value)
 
-        value = el.find('{http://www.opengis.net/context}MetadataURL')
+        value = self.el.find('{http://www.opengis.net/context}MetadataURL')
         if value is not None:
             self.metadataurl = URLType(value)
 
-        value = el.find('{http://www.opengis.net/sld}MinScaleDenominator')
+        value = self.el.find('{http://www.opengis.net/sld}MinScaleDenominator')
         if value is not None:
             self.minscale = URLType(value)
 
-        value = el.find('{http://www.opengis.net/sld}MaxScaleDenominator')
+        value = self.el.find('{http://www.opengis.net/sld}MaxScaleDenominator')
         if value is not None:
             self.maxscale = URLType(value)
 
-        for srs in el.findall('{http://www.opengis.net/context}SRS'):
+        for srs in self.el.findall('{http://www.opengis.net/context}SRS'):
             self.srslist.append(srs.text)
 
-        for format_ in el.findall('{http://www.opengis.net/context}FormatList/{http://www.opengis.net/context}Format'):
+        for format_ in self.el.findall('{http://www.opengis.net/context}FormatList/{http://www.opengis.net/context}Format'):
             self.formats.append({'name': format_.text, 'current': format_.attrib.get('current')})
 
-        for style in el.findall('{http://www.opengis.net/context}StyleList/{http://www.opengis.net/context}Style'):
+        for style in self.el.findall('{http://www.opengis.net/context}StyleList/{http://www.opengis.net/context}Style'):
             style_ = {}
             style_['current'] = style.attrib.get('current')
             style_['name'] = style.find('{http://www.opengis.net/context}Name').text
@@ -569,7 +667,7 @@ class Layer(object):
 
             self.styles.append(style_)
 
-        for dimension in el.findall('{http://www.opengis.net/context}DimensionList/{http://www.opengis.net/context}Dimension'):
+        for dimension in self.el.findall('{http://www.opengis.net/context}DimensionList/{http://www.opengis.net/context}Dimension'):
             dimension_ = []
             dimension_['name'] = dimension.attrib.get('name')
             dimension_['units'] = dimension.attrib.get('units')
@@ -582,6 +680,25 @@ class Layer(object):
 
             self.dimensions.append(dimension_)
 
+    def toexml(self):
+        """serialize to etree.Element"""
+
+        layer = etree.Element(self.el.tag)
+
+        layer.attrib['queryable'] = self.queryable or '0'
+        layer.attrib['hidden'] = self.hidden or '0'
+
+        server = etree.SubElement(layer, '{http://www.opengis.net/context}Server', service=self.server['service'], version=self.server['version'], title=self.server['title'])
+        or_ = etree.SubElement(server, '{http://www.opengis.net/context}OnlineResource')
+        or_.attrib['{http://www.w3.org/1999/xlink}type'] = 'simple'
+        or_.attrib['{http://www.w3.org/1999/xlink}href'] = self.server['url']
+
+        etree.SubElement(layer, '{http://www.opengis.net/context}Name').text = self.name
+        etree.SubElement(layer, '{http://www.opengis.net/context}Title').text = self.title
+
+        return layer
+
+
     def __repr__(self):
         """representation"""
-        return '<Layer %r>' % (self.name)
+        return '<Layer %r>' % self.name
